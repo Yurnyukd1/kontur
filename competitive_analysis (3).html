@@ -1,0 +1,829 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Конкурентный анализ — Контур Университет</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Unbounded:wght@300;400;600;700&family=Geologica:wght@300;400;500&display=swap');
+
+  :root {
+    --bg: #0a0c10;
+    --surface: #111418;
+    --surface2: #181d24;
+    --border: #1e2530;
+    --accent: #3b82f6;
+    --accent2: #06b6d4;
+    --accent3: #8b5cf6;
+    --green: #10b981;
+    --red: #ef4444;
+    --yellow: #f59e0b;
+    --text: #e2e8f0;
+    --text-muted: #64748b;
+    --text-dim: #94a3b8;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Geologica', sans-serif;
+    font-weight: 300;
+    overflow-x: hidden;
+  }
+
+  /* HEADER */
+  .header {
+    padding: 60px 40px 40px;
+    border-bottom: 1px solid var(--border);
+    position: relative;
+    overflow: hidden;
+  }
+  .header::before {
+    content: '';
+    position: absolute;
+    top: -100px; left: -100px;
+    width: 500px; height: 500px;
+    background: radial-gradient(circle, rgba(59,130,246,0.08) 0%, transparent 70%);
+    pointer-events: none;
+  }
+  .header-label {
+    font-family: 'Unbounded', sans-serif;
+    font-size: 10px; font-weight: 400; letter-spacing: 3px;
+    color: var(--accent); text-transform: uppercase; margin-bottom: 16px;
+  }
+  .header h1 {
+    font-family: 'Unbounded', sans-serif;
+    font-size: clamp(24px, 4vw, 42px); font-weight: 700; line-height: 1.15; color: #fff;
+  }
+  .header h1 span { color: var(--accent); }
+  .header-meta { display: flex; gap: 32px; margin-top: 24px; flex-wrap: wrap; }
+  .meta-item { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text-dim); }
+  .meta-dot { width: 6px; height: 6px; border-radius: 50%; }
+  .dot-direct { background: var(--accent); }
+  .dot-indirect { background: var(--accent3); }
+
+  /* TABS */
+  .tabs {
+    display: flex; gap: 4px; padding: 24px 40px 0;
+    border-bottom: 1px solid var(--border); overflow-x: auto;
+  }
+  .tab {
+    padding: 10px 20px; border-radius: 8px 8px 0 0;
+    font-size: 13px; font-family: 'Unbounded', sans-serif; font-weight: 400;
+    cursor: pointer; white-space: nowrap; color: var(--text-muted);
+    border: 1px solid transparent; border-bottom: none;
+    transition: all 0.2s; background: transparent; position: relative; bottom: -1px;
+  }
+  .tab:hover { color: var(--text-dim); }
+  .tab.active { background: var(--surface); border-color: var(--border); color: var(--accent); border-bottom-color: var(--surface); }
+
+  /* CONTENT */
+  .content { padding: 0 40px 60px; }
+  .panel { display: none; }
+  .panel.active { display: block; }
+
+  /* OVERVIEW GRID */
+  .overview-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+    gap: 20px; padding-top: 32px;
+  }
+  .comp-card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 16px;
+    padding: 28px; transition: border-color 0.2s, transform 0.2s;
+    position: relative; overflow: hidden; opacity: 0; transform: translateY(16px);
+    animation: fadeUp 0.5s ease forwards;
+  }
+  .comp-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; }
+  .comp-card.direct::before { background: linear-gradient(90deg, var(--accent), var(--accent2)); }
+  .comp-card.indirect::before { background: linear-gradient(90deg, var(--accent3), #a78bfa); }
+  .comp-card:hover { border-color: #2a3444; transform: translateY(-2px); }
+  .comp-card:nth-child(1){animation-delay:.05s}.comp-card:nth-child(2){animation-delay:.10s}
+  .comp-card:nth-child(3){animation-delay:.15s}.comp-card:nth-child(4){animation-delay:.20s}
+  .comp-card:nth-child(5){animation-delay:.25s}.comp-card:nth-child(6){animation-delay:.30s}
+  .comp-card:nth-child(7){animation-delay:.35s}
+
+  .card-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
+  .card-name { font-family: 'Unbounded', sans-serif; font-size: 13px; font-weight: 600; color: #fff; line-height: 1.3; }
+  .card-type {
+    font-size: 10px; padding: 4px 10px; border-radius: 20px; white-space: nowrap;
+    font-family: 'Unbounded', sans-serif; font-weight: 400; letter-spacing: 0.5px; flex-shrink: 0;
+  }
+  .type-direct { background: rgba(59,130,246,0.12); color: var(--accent); border: 1px solid rgba(59,130,246,0.2); }
+  .type-indirect { background: rgba(139,92,246,0.12); color: #a78bfa; border: 1px solid rgba(139,92,246,0.2); }
+
+  .card-link {
+    display: inline-flex; align-items: center; gap: 5px;
+    font-size: 11px; color: var(--accent2); text-decoration: none;
+    margin-bottom: 14px; transition: opacity 0.2s; font-family: 'Unbounded', sans-serif;
+  }
+  .card-link:hover { opacity: 0.75; text-decoration: underline; }
+  .card-link::before { content: '↗'; }
+
+  .card-offer {
+    font-size: 13px; color: var(--text-dim); line-height: 1.6;
+    margin-bottom: 20px; padding-bottom: 16px; border-bottom: 1px solid var(--border);
+  }
+  .card-strengths-weak { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px; }
+  .sw-block h4 { font-size: 10px; font-family: 'Unbounded', sans-serif; font-weight: 400; letter-spacing: 1px; margin-bottom: 8px; text-transform: uppercase; }
+  .sw-block.strong h4 { color: var(--green); }
+  .sw-block.weak h4 { color: var(--red); }
+  .sw-block p { font-size: 12px; line-height: 1.5; color: var(--text-muted); }
+
+  .promo-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip { font-size: 11px; padding: 4px 10px; border-radius: 6px; background: var(--surface2); border: 1px solid var(--border); color: var(--text-dim); }
+
+  /* TABLE */
+  .table-section { padding-top: 32px; }
+  .section-title {
+    font-family: 'Unbounded', sans-serif; font-size: 11px; font-weight: 600;
+    letter-spacing: 2px; color: var(--text-muted); text-transform: uppercase; margin-bottom: 20px;
+  }
+  .comparison-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .comparison-table th {
+    background: var(--surface); padding: 12px 14px; text-align: left;
+    font-family: 'Unbounded', sans-serif; font-size: 9px; font-weight: 600;
+    letter-spacing: 1px; color: var(--text-muted); text-transform: uppercase;
+    border-bottom: 2px solid var(--border); white-space: nowrap;
+  }
+  .comparison-table td {
+    padding: 12px 14px; border-bottom: 1px solid var(--border);
+    vertical-align: middle; color: var(--text-dim); line-height: 1.4;
+  }
+  .comparison-table tr:hover td { background: rgba(255,255,255,0.02); }
+  .comp-name-cell { color: #fff !important; font-weight: 500; min-width: 150px; font-size: 12px; }
+  .badge-yes { color: var(--green); font-size: 16px; }
+  .badge-no { color: var(--red); font-size: 16px; }
+  .badge-part { color: var(--yellow); font-size: 14px; }
+
+  .score-bar-wrap { display: flex; align-items: center; gap: 8px; }
+  .score-bar { height: 4px; border-radius: 2px; background: var(--border); flex: 1; overflow: hidden; min-width: 50px; }
+  .score-fill { height: 100%; border-radius: 2px; }
+  .score-val { font-family: 'Unbounded', sans-serif; font-size: 11px; color: var(--text-dim); min-width: 26px; text-align: right; }
+
+  /* GAPS */
+  .gaps-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 16px; }
+  .gap-card { background: var(--surface); border: 1px solid rgba(16,185,129,0.2); border-radius: 12px; padding: 20px; }
+  .gap-label { font-size: 10px; font-family: 'Unbounded', sans-serif; letter-spacing: 1px; color: var(--green); margin-bottom: 8px; }
+  .gap-card h4 { font-size: 13px; color: #fff; font-weight: 500; margin-bottom: 6px; }
+  .gap-card p { font-size: 12px; color: var(--text-muted); line-height: 1.6; }
+
+  /* PROMO */
+  .promo-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(310px, 1fr)); gap: 20px; padding-top: 32px; }
+  .promo-card { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 24px; }
+  .promo-card-header { display: flex; align-items: center; gap: 12px; margin-bottom: 18px; }
+  .promo-icon { width: 40px; height: 40px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 18px; flex-shrink: 0; }
+  .promo-card-name { font-family: 'Unbounded', sans-serif; font-size: 12px; font-weight: 600; color: #fff; line-height: 1.3; }
+
+  .list-label { font-size: 9px; font-family: 'Unbounded', sans-serif; letter-spacing: 1.5px; margin-bottom: 8px; text-transform: uppercase; }
+  .list-label.ch { color: var(--accent); }
+  .list-label.cr { color: var(--accent2); }
+  .list-label.fn { color: var(--green); }
+
+  .channel-item { display: flex; align-items: flex-start; gap: 6px; font-size: 12px; color: var(--text-dim); padding: 3px 0; line-height: 1.4; }
+  .channel-item::before { content: '→'; color: var(--accent); font-size: 10px; flex-shrink: 0; margin-top: 2px; }
+  .channel-item a { color: var(--accent2); text-decoration: none; }
+  .channel-item a:hover { text-decoration: underline; }
+
+  .creative-item { display: flex; gap: 8px; font-size: 12px; color: var(--text-muted); padding: 3px 0; line-height: 1.5; }
+  .creative-item .num { color: var(--accent2); font-family: 'Unbounded', sans-serif; font-size: 10px; min-width: 18px; flex-shrink: 0; }
+
+  .example-post {
+    margin-top: 14px; padding: 12px 14px;
+    background: rgba(59,130,246,0.05); border: 1px solid rgba(59,130,246,0.12);
+    border-left: 3px solid var(--accent); border-radius: 0 8px 8px 0;
+    font-size: 11.5px; color: var(--text-dim); line-height: 1.6; font-style: italic;
+  }
+  .example-post strong {
+    color: var(--accent); font-family: 'Unbounded', sans-serif; font-size: 8px;
+    letter-spacing: 1px; display: block; margin-bottom: 6px; font-style: normal;
+  }
+
+  .promo-divider { height: 1px; background: var(--border); margin: 14px 0; }
+
+  .funnel-block {
+    margin-top: 14px; padding: 14px;
+    background: rgba(16,185,129,0.05); border: 1px solid rgba(16,185,129,0.12); border-radius: 10px;
+  }
+  .funnel-block h5 { font-size: 9px; font-family: 'Unbounded', sans-serif; color: var(--green); letter-spacing: 1px; text-transform: uppercase; margin-bottom: 10px; }
+  .funnel-step { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--text-muted); padding: 2px 0; }
+  .funnel-arrow { color: var(--green); font-size: 10px; flex-shrink: 0; }
+  .funnel-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+  .funnel-dest {
+    font-size: 10px; padding: 3px 9px; border-radius: 5px; font-family: 'Unbounded', sans-serif;
+  }
+  .dest-consult { background: rgba(245,158,11,0.1); color: var(--yellow); border: 1px solid rgba(245,158,11,0.2); }
+  .dest-free { background: rgba(139,92,246,0.1); color: #a78bfa; border: 1px solid rgba(139,92,246,0.2); }
+  .dest-event { background: rgba(59,130,246,0.1); color: var(--accent); border: 1px solid rgba(59,130,246,0.2); }
+  .dest-site { background: rgba(6,182,212,0.1); color: var(--accent2); border: 1px solid rgba(6,182,212,0.2); }
+
+  /* SEEDS */
+  .seeds-section { padding-top: 32px; }
+  .seeds-highlight {
+    background: linear-gradient(135deg, rgba(59,130,246,0.08), rgba(6,182,212,0.05));
+    border: 1px solid rgba(59,130,246,0.15); border-radius: 16px; padding: 28px; margin-bottom: 28px;
+  }
+  .seeds-highlight h3 { font-family: 'Unbounded', sans-serif; font-size: 14px; font-weight: 600; color: #fff; margin-bottom: 12px; }
+  .seeds-highlight p { font-size: 13px; color: var(--text-dim); line-height: 1.7; }
+
+  .format-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px; }
+  .format-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 20px; }
+  .format-num { font-family: 'Unbounded', sans-serif; font-size: 11px; color: var(--accent); margin-bottom: 8px; }
+  .format-card h4 { font-family: 'Unbounded', sans-serif; font-size: 12px; font-weight: 600; color: #fff; margin-bottom: 8px; line-height: 1.4; }
+  .format-card p { font-size: 12px; color: var(--text-muted); line-height: 1.5; }
+
+  /* INSIGHTS */
+  .insights-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px; padding-top: 32px; }
+  .insight-card { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 28px; }
+  .insight-num { font-family: 'Unbounded', sans-serif; font-size: 36px; font-weight: 700; color: var(--border); line-height: 1; margin-bottom: 16px; }
+  .insight-title { font-family: 'Unbounded', sans-serif; font-size: 13px; font-weight: 600; color: #fff; margin-bottom: 10px; line-height: 1.4; }
+  .insight-text { font-size: 13px; color: var(--text-muted); line-height: 1.7; }
+  .insight-tag { display: inline-block; margin-top: 14px; font-size: 11px; padding: 5px 12px; border-radius: 6px; font-family: 'Unbounded', sans-serif; font-weight: 400; }
+  .tag-opportunity { background: rgba(16,185,129,0.1); color: var(--green); border: 1px solid rgba(16,185,129,0.2); }
+  .tag-risk { background: rgba(239,68,68,0.1); color: var(--red); border: 1px solid rgba(239,68,68,0.2); }
+  .tag-action { background: rgba(59,130,246,0.1); color: var(--accent); border: 1px solid rgba(59,130,246,0.2); }
+
+  @keyframes fadeUp { to { opacity: 1; transform: translateY(0); } }
+
+  @media (max-width: 600px) {
+    .header, .tabs, .content { padding-left: 20px; padding-right: 20px; }
+    .card-strengths-weak { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-label">Контур Университет · Маркетинг</div>
+  <h1>Конкурентный<br><span>анализ рынка</span></h1>
+  <div class="header-meta">
+    <div class="meta-item"><div class="meta-dot dot-direct"></div> Прямые конкуренты (5)</div>
+    <div class="meta-item"><div class="meta-dot dot-indirect"></div> Косвенные конкуренты (2)</div>
+  </div>
+</div>
+
+<div class="tabs">
+  <div class="tab active" onclick="showTab('overview', event)">Обзор конкурентов</div>
+  <div class="tab" onclick="showTab('compare', event)">Сравнительная таблица</div>
+  <div class="tab" onclick="showTab('promo', event)">Каналы и Креативы</div>
+  <div class="tab" onclick="showTab('seeds', event)">Форматы посевов</div>
+  <div class="tab" onclick="showTab('insights', event)">Выводы и возможности</div>
+</div>
+
+<div class="content">
+
+  <!-- ===== 1. OVERVIEW ===== -->
+  <div class="panel active" id="panel-overview">
+    <div class="overview-grid">
+
+      <div class="comp-card direct">
+        <div class="card-header">
+          <div class="card-name">НИУ ВШЭ (СПб)<br>Бизнес- и ИТ-архитектура</div>
+          <div class="card-type type-direct">Прямой</div>
+        </div>
+        <a href="https://spb.hse.ru" target="_blank" class="card-link">spb.hse.ru</a>
+        <div class="card-offer">Подготовка бизнес-/ИТ-архитекторов, CDTO/CDO/CIO. Сильный блок по архитектуре предприятия, данным и процессам. Проекты на базе компаний-партнёров. Формат — академически-деловой: страницы с модулями, паспорт программы.</div>
+        <div class="card-strengths-weak">
+          <div class="sw-block strong"><h4>✦ Сильное</h4><p>«Серьёзная» рамка: детальная структура компетенций. Проектная работа у партнёров выглядит надёжно.</p></div>
+          <div class="sw-block weak"><h4>✦ Слабое</h4><p>Тяжёлый «вузовский» текст. Ценность не считывается мгновенно. Мало живых артефактов результата.</p></div>
+        </div>
+        <div class="promo-chips">
+          <span class="chip">Telegram факультета</span><span class="chip">Карьерные каналы</span><span class="chip">Преподаватели-эксперты</span>
+        </div>
+      </div>
+
+      <div class="comp-card direct">
+        <div class="card-header">
+          <div class="card-name">ИТМО<br>Технологии и стратегии бизнес-трансформации</div>
+          <div class="card-type type-direct">Прямой</div>
+        </div>
+        <a href="https://abit.itmo.ru" target="_blank" class="card-link">abit.itmo.ru</a>
+        <div class="card-offer">«Лидеры цифровой эпохи». Процессная трансформация, диагностика цифровой зрелости, проектирование AI-решений, расчёт экономического эффекта. Кейсы от партнёрских компаний. Очное, 2 года.</div>
+        <div class="card-strengths-weak">
+          <div class="sw-block strong"><h4>✦ Сильное</h4><p>Чётко понятно «про что»: трансформация + AI + экономический эффект + партнёрские кейсы.</p></div>
+          <div class="sw-block weak"><h4>✦ Слабое</h4><p>Фокус уже, чем «архитектура предприятия». Мало про управляемую устойчивую эксплуатацию изменений.</p></div>
+        </div>
+        <div class="promo-chips">
+          <span class="chip">IT-сообщества</span><span class="chip">AI-повестка</span><span class="chip">Видео-тизеры ДОД</span>
+        </div>
+      </div>
+
+      <div class="comp-card direct">
+        <div class="card-header">
+          <div class="card-name">СКОЛКОВО<br>AI Shift / CDTO-линейка</div>
+          <div class="card-type type-direct">Прямой</div>
+        </div>
+        <a href="https://skolkovo.ru" target="_blank" class="card-link">skolkovo.ru</a>
+        <div class="card-offer">Внедрение AI в бизнес-процессы: диагностика → дизайн → пилоты → масштабирование. Умение считать ROI/KPI. Проект на базе своей компании. Менторское сопровождение между модулями. Executive-лендинг с акцентом на результат.</div>
+        <div class="card-strengths-weak">
+          <div class="sw-block strong"><h4>✦ Сильное</h4><p>Премиум-упаковка. Конкретные результаты (пилоты, ROI). Модульность + менторы + много очного обучения.</p></div>
+          <div class="sw-block weak"><h4>✦ Слабое</h4><p>AI-рамка может восприниматься как «тренд-обёртка», если клиенту нужна архитектура в целом.</p></div>
+        </div>
+        <div class="promo-chips">
+          <span class="chip">Личный бренд преподавателей</span><span class="chip">Видеопродакшн</span><span class="chip">Интервью выпускников</span>
+        </div>
+      </div>
+
+      <div class="comp-card direct">
+        <div class="card-header">
+          <div class="card-name">СберУниверситет<br>Цифровая трансформация бизнеса</div>
+          <div class="card-type type-direct">Прямой</div>
+        </div>
+        <a href="https://sberuniversity.ru" target="_blank" class="card-link">sberuniversity.ru</a>
+        <div class="card-offer">Лучшие практики цифровой трансформации + инструменты/технологии. Очные модули, командные проекты с трекерами, симуляции, экскурсии. Спикеры экосистемы Сбера. Бренд как главный актив.</div>
+        <div class="card-strengths-weak">
+          <div class="sw-block strong"><h4>✦ Сильное</h4><p>Максимум доверия за счёт бренда. Понятная «сцена» для руководителей. Вход в практики большой экосистемы.</p></div>
+          <div class="sw-block weak"><h4>✦ Слабое</h4><p>Много широких обещаний («освоить», «изменить бизнес»). Мало конкретики про артефакты и стандарты качества выпускника.</p></div>
+        </div>
+        <div class="promo-chips">
+          <span class="chip">Telegram экосистемы</span><span class="chip">Видеорепортажи</span><span class="chip">Спикеры-звёзды</span>
+        </div>
+      </div>
+
+      <div class="comp-card direct">
+        <div class="card-header">
+          <div class="card-name">Центральный Университет<br>Продуктовый менеджмент / ML / AI</div>
+          <div class="card-type type-direct">Прямой</div>
+        </div>
+        <a href="https://cu.ru" target="_blank" class="card-link">cu.ru / apply.centraluniversity.ru</a>
+        <div class="card-offer">Первый в России STEM-вуз, созданный бизнесом (Т-Банк + 50+ партнёров). Магистратура: Продуктовый менеджмент, Продуктовая аналитика, ML, Backend. Совместные программы с Билайном, МФТИ, ВШЭ, Сколтехом. Реальные бизнес-задачи с 1-го семестра, гранты до 100%.</div>
+        <div class="card-strengths-weak">
+          <div class="sw-block strong"><h4>✦ Сильное</h4><p>Сильный tech-бренд и индустриальные партнёры. Реальные проекты и оплачиваемые стажировки. Гранты как инструмент привлечения. Среда и атмосфера IT-компании.</p></div>
+          <div class="sw-block weak"><h4>✦ Слабое</h4><p>Фокус на tech/product-специалистах, не на архитекторах изменений. Нет явного блока по IT-ландшафту и устойчивости трансформации.</p></div>
+        </div>
+        <div class="promo-chips">
+          <span class="chip">TG-канал ЦУ</span><span class="chip">IT-сообщества</span><span class="chip">Хабр / VC</span><span class="chip">Бесплатные интенсивы</span>
+        </div>
+      </div>
+
+      <div class="comp-card indirect">
+        <div class="card-header">
+          <div class="card-name">Product Lab<br>Корпоративное обучение (Product Focus)</div>
+          <div class="card-type type-indirect">Косвенный</div>
+        </div>
+        <a href="https://productlab.ru" target="_blank" class="card-link">productlab.ru</a>
+        <div class="card-offer">Корпоративный продуктовый подход «на данных вашей компании». Кастомизация, трекинг, внедрение. Методология Product Focus. Коммерческий B2B-сайт с акцентом на прагматику.</div>
+        <div class="card-strengths-weak">
+          <div class="sw-block strong"><h4>✦ Сильное</h4><p>Для бизнеса прагматично: «на ваших данных», «кастом», «внедрение» — снимает страх «послушали и забыли».</p></div>
+          <div class="sw-block weak"><h4>✦ Слабое</h4><p>Местами слишком маркетинговые формулировки. Меньше технологической глубины и архитектуры изменений.</p></div>
+        </div>
+        <div class="promo-chips">
+          <span class="chip">Посевы в Telegram</span><span class="chip">Статьи на VC / Хабр</span><span class="chip">Лид-магниты</span>
+        </div>
+      </div>
+
+      <div class="comp-card indirect">
+        <div class="card-header">
+          <div class="card-name">Яндекс Практикум PRO + Нетология<br>Продакт-менеджмент</div>
+          <div class="card-type type-indirect">Косвенный</div>
+        </div>
+        <a href="https://practicum.yandex.ru" target="_blank" class="card-link">practicum.yandex.ru / netology.ru</a>
+        <div class="card-offer">Массовый рынок продуктовых навыков. Практика на реальных кейсах, сквозные проекты. Нетология: 8 мес., 70ч теории + 198ч практики, вечернее расписание.</div>
+        <div class="card-strengths-weak">
+          <div class="sw-block strong"><h4>✦ Сильное</h4><p>Сильный UX: сразу видно как учишься, сколько длится. Хорошо закрывает тревогу новичка «от нуля».</p></div>
+          <div class="sw-block weak"><h4>✦ Слабое</h4><p>«Продакт-скиллы», а не архитектура трансформации. Мало связи с IT-ландшафтом и устойчивой эксплуатацией изменений.</p></div>
+        </div>
+        <div class="promo-chips">
+          <span class="chip">SEO / органика</span><span class="chip">Контент-маркетинг</span><span class="chip">Ретаргетинг</span>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ===== 2. COMPARE ===== -->
+  <div class="panel" id="panel-compare">
+    <div class="table-section">
+      <div class="section-title">Сравнение по ключевым параметрам</div>
+      <div style="overflow-x:auto;border-radius:12px;border:1px solid var(--border);">
+        <table class="comparison-table">
+          <thead>
+            <tr>
+              <th>Конкурент</th>
+              <th>Тип</th>
+              <th>Аудитория</th>
+              <th>Реальный проект</th>
+              <th>AI / Цифровизация</th>
+              <th>Архитектура предприятия</th>
+              <th>Артефакты выпускника</th>
+              <th>Устойчивая эксплуатация</th>
+              <th>IT-ландшафт + портфель</th>
+              <th>Партнёры / кейсы</th>
+              <th>B2B / корпорат.</th>
+              <th>Упаковка оффера</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="comp-name-cell">НИУ ВШЭ</td>
+              <td><span style="color:var(--accent);font-size:10px;font-family:'Unbounded',sans-serif;">Прямой</span></td>
+              <td style="font-size:11px;">CIO / CDTO, абитуриенты</td>
+              <td><span class="badge-yes">✓</span></td>
+              <td><span class="badge-part">◐</span></td>
+              <td><span class="badge-yes">✓</span></td>
+              <td><span class="badge-no">✗</span></td>
+              <td><span class="badge-no">✗</span></td>
+              <td><span class="badge-yes">✓</span></td>
+              <td><span class="badge-yes">✓</span></td>
+              <td><span class="badge-part">◐</span></td>
+              <td><div class="score-bar-wrap"><div class="score-bar"><div class="score-fill" style="width:55%;background:linear-gradient(90deg,#3b82f6,#06b6d4)"></div></div><div class="score-val">55</div></div></td>
+            </tr>
+            <tr>
+              <td class="comp-name-cell">ИТМО</td>
+              <td><span style="color:var(--accent);font-size:10px;font-family:'Unbounded',sans-serif;">Прямой</span></td>
+              <td style="font-size:11px;">IT-специалисты, менеджеры</td>
+              <td><span class="badge-yes">✓</span></td>
+              <td><span class="badge-yes">✓</span></td>
+              <td><span class="badge-part">◐</span></td>
+              <td><span class="badge-part">◐</span></td>
+              <td><span class="badge-no">✗</span></td>
+              <td><span class="badge-part">◐</span></td>
+              <td><span class="badge-yes">✓</span></td>
+              <td><span class="badge-no">✗</span></td>
+              <td><div class="score-bar-wrap"><div class="score-bar"><div class="score-fill" style="width:65%;background:linear-gradient(90deg,#3b82f6,#06b6d4)"></div></div><div class="score-val">65</div></div></td>
+            </tr>
+            <tr>
+              <td class="comp-name-cell">СКОЛКОВО</td>
+              <td><span style="color:var(--accent);font-size:10px;font-family:'Unbounded',sans-serif;">Прямой</span></td>
+              <td style="font-size:11px;">Топ-менеджеры, C-level</td>
+              <td><span class="badge-yes">✓</span></td>
+              <td><span class="badge-yes">✓</span></td>
+              <td><span class="badge-part">◐</span></td>
+              <td><span class="badge-yes">✓</span></td>
+              <td><span class="badge-no">✗</span></td>
+              <td><span class="badge-part">◐</span></td>
+              <td><span class="badge-yes">✓</span></td>
+              <td><span class="badge-no">✗</span></td>
+              <td><div class="score-bar-wrap"><div class="score-bar"><div class="score-fill" style="width:88%;background:linear-gradient(90deg,#3b82f6,#06b6d4)"></div></div><div class="score-val">88</div></div></td>
+            </tr>
+            <tr>
+              <td class="comp-name-cell">СберУниверситет</td>
+              <td><span style="color:var(--accent);font-size:10px;font-family:'Unbounded',sans-serif;">Прямой</span></td>
+              <td style="font-size:11px;">Руководители всех уровней</td>
+              <td><span class="badge-yes">✓</span></td>
+              <td><span class="badge-part">◐</span></td>
+              <td><span class="badge-part">◐</span></td>
+              <td><span class="badge-no">✗</span></td>
+              <td><span class="badge-no">✗</span></td>
+              <td><span class="badge-part">◐</span></td>
+              <td><span class="badge-yes">✓</span></td>
+              <td><span class="badge-yes">✓</span></td>
+              <td><div class="score-bar-wrap"><div class="score-bar"><div class="score-fill" style="width:70%;background:linear-gradient(90deg,#3b82f6,#06b6d4)"></div></div><div class="score-val">70</div></div></td>
+            </tr>
+            <tr>
+              <td class="comp-name-cell">Центральный Университет</td>
+              <td><span style="color:var(--accent);font-size:10px;font-family:'Unbounded',sans-serif;">Прямой</span></td>
+              <td style="font-size:11px;">IT-специалисты, продакты</td>
+              <td><span class="badge-yes">✓</span></td>
+              <td><span class="badge-yes">✓</span></td>
+              <td><span class="badge-no">✗</span></td>
+              <td><span class="badge-part">◐</span></td>
+              <td><span class="badge-no">✗</span></td>
+              <td><span class="badge-no">✗</span></td>
+              <td><span class="badge-yes">✓</span></td>
+              <td><span class="badge-no">✗</span></td>
+              <td><div class="score-bar-wrap"><div class="score-bar"><div class="score-fill" style="width:80%;background:linear-gradient(90deg,#3b82f6,#06b6d4)"></div></div><div class="score-val">80</div></div></td>
+            </tr>
+            <tr>
+              <td class="comp-name-cell">Product Lab</td>
+              <td><span style="color:#a78bfa;font-size:10px;font-family:'Unbounded',sans-serif;">Косвенный</span></td>
+              <td style="font-size:11px;">B2B, продуктовые команды</td>
+              <td><span class="badge-yes">✓</span></td>
+              <td><span class="badge-no">✗</span></td>
+              <td><span class="badge-no">✗</span></td>
+              <td><span class="badge-part">◐</span></td>
+              <td><span class="badge-no">✗</span></td>
+              <td><span class="badge-no">✗</span></td>
+              <td><span class="badge-yes">✓</span></td>
+              <td><span class="badge-yes">✓</span></td>
+              <td><div class="score-bar-wrap"><div class="score-bar"><div class="score-fill" style="width:60%;background:linear-gradient(90deg,#8b5cf6,#a78bfa)"></div></div><div class="score-val">60</div></div></td>
+            </tr>
+            <tr>
+              <td class="comp-name-cell">Яндекс / Нетология</td>
+              <td><span style="color:#a78bfa;font-size:10px;font-family:'Unbounded',sans-serif;">Косвенный</span></td>
+              <td style="font-size:11px;">Специалисты, новички</td>
+              <td><span class="badge-yes">✓</span></td>
+              <td><span class="badge-no">✗</span></td>
+              <td><span class="badge-no">✗</span></td>
+              <td><span class="badge-part">◐</span></td>
+              <td><span class="badge-no">✗</span></td>
+              <td><span class="badge-no">✗</span></td>
+              <td><span class="badge-part">◐</span></td>
+              <td><span class="badge-no">✗</span></td>
+              <td><div class="score-bar-wrap"><div class="score-bar"><div class="score-fill" style="width:75%;background:linear-gradient(90deg,#8b5cf6,#a78bfa)"></div></div><div class="score-val">75</div></div></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div style="display:flex;gap:24px;margin-top:16px;font-size:12px;color:var(--text-muted);flex-wrap:wrap;">
+        <span><span class="badge-yes">✓</span> Есть</span>
+        <span><span class="badge-part">◐</span> Частично</span>
+        <span><span class="badge-no">✗</span> Нет</span>
+        <span style="margin-left:auto;color:var(--text-muted);">Упаковка оффера — чёткость и убедительность коммуникации (0–100)</span>
+      </div>
+
+      <div style="margin-top:40px;">
+        <div class="section-title">Незакрытые ниши у конкурентов</div>
+        <div class="gaps-grid">
+          <div class="gap-card">
+            <div class="gap-label">Возможность 1</div>
+            <h4>Устойчивая эксплуатация изменений</h4>
+            <p>Никто явно не обещает «как поддерживать изменения после запуска» — все останавливаются на пилотах и трансформации.</p>
+          </div>
+          <div class="gap-card">
+            <div class="gap-label">Возможность 2</div>
+            <h4>Конкретные артефакты на выходе</h4>
+            <p>ВШЭ и Сбер не показывают «что будет на руках» — только перечни дисциплин и широкие обещания без конкретного результата.</p>
+          </div>
+          <div class="gap-card">
+            <div class="gap-label">Возможность 3</div>
+            <h4>Полный IT-ландшафт + портфель</h4>
+            <p>AI-игроки (ИТМО, Сколково, ЦУ) фокусируются на AI/процессах, не покрывая архитектуру предприятия и качество эксплуатации целиком.</p>
+          </div>
+          <div class="gap-card">
+            <div class="gap-label">Возможность 4</div>
+            <h4>Аудитория управленцев ≠ технарей</h4>
+            <p>ЦУ и Практикум работают с tech-специалистами. Руководители-нетехнари с бюджетом и запросом на архитектуру изменений недостаточно охвачены.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== 3. PROMO ===== -->
+  <div class="panel" id="panel-promo">
+    <div class="promo-grid">
+
+      <div class="promo-card">
+        <div class="promo-card-header">
+          <div class="promo-icon" style="background:rgba(59,130,246,0.1);">🎓</div>
+          <div class="promo-card-name">НИУ ВШЭ (СПб)</div>
+        </div>
+        <div class="list-label ch">Каналы размещения</div>
+        <div class="channel-item">Telegram-канал факультета</div>
+        <div class="channel-item">Образовательные и карьерные каналы</div>
+        <div class="channel-item">IT-менторинговые сообщества</div>
+        <div class="channel-item">Студенческие и абитуриентские сообщества</div>
+        <div class="channel-item">Личные каналы преподавателей (репосты)</div>
+        <div class="promo-divider"></div>
+        <div class="list-label cr">Форматы</div>
+        <div class="creative-item"><span class="num">1.</span> Академический экспертный пост «Как меняется роль CIO в 2025» + аналитика + ДОД</div>
+        <div class="creative-item"><span class="num">2.</span> Карточки с карьерными траекториями: CDTO → CIO → архитектор предприятия</div>
+        <div class="creative-item"><span class="num">3.</span> Преподаватель-герой: фото + регалии + цитата об архитектуре</div>
+        <div class="funnel-block">
+          <h5>Воронка трафика</h5>
+          <div class="funnel-step"><span class="funnel-arrow">→</span> Пост / посев в TG-канале</div>
+          <div class="funnel-step"><span class="funnel-arrow">→</span> Страница программы на spb.hse.ru</div>
+          <div class="funnel-step"><span class="funnel-arrow">→</span> Регистрация на День открытых дверей</div>
+          <div class="funnel-tags">
+            <span class="funnel-dest dest-event">Мероприятие (ДОД)</span>
+            <span class="funnel-dest dest-site">Сайт программы</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="promo-card">
+        <div class="promo-card-header">
+          <div class="promo-icon" style="background:rgba(6,182,212,0.1);">🚀</div>
+          <div class="promo-card-name">ИТМО</div>
+        </div>
+        <div class="list-label ch">Каналы размещения</div>
+        <div class="channel-item">Telegram-канал вуза</div>
+        <div class="channel-item">IT-сообщества и тематические каналы трансформации</div>
+        <div class="channel-item">AI/ML каналы — тематические посевы по AI-повестке</div>
+        <div class="channel-item">Видео-тизеры ДОД на YouTube</div>
+        <div class="channel-item">Посты через компании-партнёры</div>
+        <div class="promo-divider"></div>
+        <div class="list-label cr">Форматы</div>
+        <div class="creative-item"><span class="num">1.</span> AI-триггер + конкретная боль бизнеса + приглашение на ДОД</div>
+        <div class="creative-item"><span class="num">2.</span> Пост с цифрами: 2 года / очное / проекты с компаниями</div>
+        <div class="creative-item"><span class="num">3.</span> Сценарий «Профессии будущего»: роль «Лидера цифровой эпохи»</div>
+        <div class="funnel-block">
+          <h5>Воронка трафика</h5>
+          <div class="funnel-step"><span class="funnel-arrow">→</span> Посев / органика в IT-каналах</div>
+          <div class="funnel-step"><span class="funnel-arrow">→</span> Страница программы abit.itmo.ru</div>
+          <div class="funnel-step"><span class="funnel-arrow">→</span> Регистрация на ДОД / подача заявки</div>
+          <div class="funnel-tags">
+            <span class="funnel-dest dest-event">Мероприятие (ДОД)</span>
+            <span class="funnel-dest dest-site">Страница поступления</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="promo-card">
+        <div class="promo-card-header">
+          <div class="promo-icon" style="background:rgba(139,92,246,0.1);">🧠</div>
+          <div class="promo-card-name">СКОЛКОВО</div>
+        </div>
+        <div class="list-label ch">Каналы размещения</div>
+        <div class="channel-item">Telegram-канал школы</div>
+        <div class="channel-item">Бизнес-каналы и предпринимательские сообщества</div>
+        <div class="channel-item">Личные каналы преподавателей и выпускников-CDTO</div>
+        <div class="channel-item">YouTube: интервью выпускников, видеокейсы</div>
+        <div class="channel-item">Партнёрские рассылки в b2b-экосистемах</div>
+        <div class="promo-divider"></div>
+        <div class="list-label cr">Форматы</div>
+        <div class="creative-item"><span class="num">1.</span> Executive-тон + чёрный визуал + конкретный результат (ROI, пилот)</div>
+        <div class="creative-item"><span class="num">2.</span> Интервью выпускника: «Как я стал CDTO» — кейс топ-менеджера</div>
+        <div class="creative-item"><span class="num">3.</span> Дефицит: «Закрытый набор — 30 мест» + таймер</div>
+        <div class="creative-item"><span class="num">4.</span> Результат через ROI: «Пилот окупился за 4 месяца»</div>
+        <div class="funnel-block">
+          <h5>Воронка трафика</h5>
+          <div class="funnel-step"><span class="funnel-arrow">→</span> Посев / видео / личный бренд</div>
+          <div class="funnel-step"><span class="funnel-arrow">→</span> Лендинг программы на skolkovo.ru</div>
+          <div class="funnel-step"><span class="funnel-arrow">→</span> Личная консультация с менеджером</div>
+          <div class="funnel-tags">
+            <span class="funnel-dest dest-consult">Консультация</span>
+            <span class="funnel-dest dest-event">Открытый вебинар</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="promo-card">
+        <div class="promo-card-header">
+          <div class="promo-icon" style="background:rgba(16,185,129,0.1);">🏢</div>
+          <div class="promo-card-name">СберУниверситет</div>
+        </div>
+        <div class="list-label ch">Каналы размещения</div>
+        <div class="channel-item">Telegram-канал экосистемы</div>
+        <div class="channel-item">Каналы СберБизнеса и корпоративных партнёров</div>
+        <div class="channel-item">YouTube: видеорепортажи с мероприятий и кампуса</div>
+        <div class="channel-item">Внутренние рассылки экосистемы Сбера (закрытые)</div>
+        <div class="channel-item">LinkedIn для B2B-аудитории</div>
+        <div class="promo-divider"></div>
+        <div class="list-label cr">Форматы</div>
+        <div class="creative-item"><span class="num">1.</span> Кампус и атмосфера: фото залов, живого общения руководителей</div>
+        <div class="creative-item"><span class="num">2.</span> Спикеры-звёзды: фото + цитаты известных практиков рынка</div>
+        <div class="creative-item"><span class="num">3.</span> Нетворкинг-акцент: «Ваши однокурсники — действующие директора»</div>
+        <div class="funnel-block">
+          <h5>Воронка трафика</h5>
+          <div class="funnel-step"><span class="funnel-arrow">→</span> Контент в TG / видео / посев</div>
+          <div class="funnel-step"><span class="funnel-arrow">→</span> Сайт программы sberuniversity.ru</div>
+          <div class="funnel-step"><span class="funnel-arrow">→</span> Заявка / звонок менеджера программы</div>
+          <div class="funnel-tags">
+            <span class="funnel-dest dest-consult">Звонок менеджера</span>
+            <span class="funnel-dest dest-event">Открытое мероприятие</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="promo-card">
+        <div class="promo-card-header">
+          <div class="promo-icon" style="background:rgba(245,158,11,0.1);">🎯</div>
+          <div class="promo-card-name">Центральный Университет</div>
+        </div>
+        <div class="list-label ch">Каналы размещения</div>
+        <div class="channel-item">Telegram-канал ЦУ</div>
+        <div class="channel-item">IT-карьерные каналы и сообщества разработчиков</div>
+        <div class="channel-item">Продуктовые Telegram-каналы</div>
+        <div class="channel-item">Статьи на Хабре и VC: от студентов и преподавателей</div>
+        <div class="channel-item">TG-бот для первичной коммуникации</div>
+        <div class="promo-divider"></div>
+        <div class="list-label cr">Форматы</div>
+        <div class="creative-item"><span class="num">1.</span> Бесплатный интенсив как лид-магнит: «AI для продактов + грант 75%»</div>
+        <div class="creative-item"><span class="num">2.</span> История студента на Хабре: «Я пришёл из backend, стал продактом — 1 семестр в ЦУ»</div>
+        <div class="creative-item"><span class="num">3.</span> Партнёрский кейс: «Учёба + стипендия 30к + реальные задачи Билайна»</div>
+        <div class="creative-item"><span class="num">4.</span> Грант как триггер: «Лучшие — учатся бесплатно. Конкурс грантов открыт»</div>
+        <div class="funnel-block">
+          <h5>Воронка трафика</h5>
+          <div class="funnel-step"><span class="funnel-arrow">→</span> Посев / пост / статья на Хабре</div>
+          <div class="funnel-step"><span class="funnel-arrow">→</span> Бесплатный интенсив / День открытых дверей</div>
+          <div class="funnel-step"><span class="funnel-arrow">→</span> Заявка в магистратуру / конкурс грантов</div>
+          <div class="funnel-tags">
+            <span class="funnel-dest dest-free">Бесплатный интенсив</span>
+            <span class="funnel-dest dest-event">Открытый день</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="promo-card">
+        <div class="promo-card-header">
+          <div class="promo-icon" style="background:rgba(139,92,246,0.1);">🧩</div>
+          <div class="promo-card-name">Product Lab</div>
+        </div>
+        <div class="list-label ch">Каналы размещения</div>
+        <div class="channel-item">Продуктовые Telegram-каналы</div>
+        <div class="channel-item">Кейсы с метриками в формате постов в TG</div>
+        <div class="channel-item">Партнёрские вебинары с продуктовыми комьюнити</div>
+        <div class="channel-item">Статьи на VC.ru и Хабр про продуктовый подход</div>
+        <div class="channel-item">Лид-магниты: PDF-чек-листы, шаблоны метрик</div>
+        <div class="promo-divider"></div>
+        <div class="list-label cr">Форматы</div>
+        <div class="creative-item"><span class="num">1.</span> Цифры и ROI: «Клиент вырастил NPS +20% за 3 месяца — вот как»</div>
+        <div class="creative-item"><span class="num">2.</span> Проблемный заход: «Ваш продукт буксует? Скорее всего, дело не в команде»</div>
+        <div class="creative-item"><span class="num">3.</span> Лид-магнит: «Скачай чек-лист продуктового аудита (PDF, 12 критериев)»</div>
+        <div class="funnel-block">
+          <h5>Воронка трафика</h5>
+          <div class="funnel-step"><span class="funnel-arrow">→</span> Посев / статья / вебинар</div>
+          <div class="funnel-step"><span class="funnel-arrow">→</span> Лид-магнит (PDF / шаблон)</div>
+          <div class="funnel-step"><span class="funnel-arrow">→</span> Заявка на корпоративную программу</div>
+          <div class="funnel-tags">
+            <span class="funnel-dest dest-free">Бесплатный материал</span>
+            <span class="funnel-dest dest-consult">Консультация</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ===== 4. SEEDS ===== -->
+  <div class="panel" id="panel-seeds">
+    <div class="seeds-section">
+      <div class="seeds-highlight">
+        <h3>Ключевой вывод по посевам</h3>
+        <p>Анализ практики конкурентов (в т.ч. Школы 21 от Сбера и ЦУ) показывает: лучший отклик дают нативные посты, которые выглядят как совет эксперта, а не как реклама. Критично соответствовать tone of voice канала и размещаться в тематических IT/продуктовых сообществах, а не только в массовых каналах.</p>
+      </div>
+
+      <div class="section-title">Рекомендуемые форматы для Контур Университета</div>
+      <div class="format-cards">
+        <div class="format-card">
+          <div class="format-num">ФОРМАТ 01</div>
+          <h4>Mini-case</h4>
+          <p>«Что должен знать архитектор изменений, прежде чем идти в цифровую трансформацию» — краткий список + приглашение на День открытых дверей с реальными примерами.</p>
+        </div>
+        <div class="format-card">
+          <div class="format-num">ФОРМАТ 02</div>
+          <h4>Checklist полезных навыков</h4>
+          <p>«5 навыков, которые вы прокачаете на программе Контур Университета» — каждый пункт как тезис + визуальный элемент. Хорошо работает как карусель в Telegram.</p>
+        </div>
+        <div class="format-card">
+          <div class="format-num">ФОРМАТ 03</div>
+          <h4>История выпускника</h4>
+          <p>Формат «до/после» + приглашение на онлайн/офлайн День открытых дверей. Один из самых конвертирующих форматов у конкурентов (Сколково, ЦУ).</p>
+        </div>
+        <div class="format-card">
+          <div class="format-num">ФОРМАТ 04</div>
+          <h4>Инфографика / Carousel</h4>
+          <p>Обзор цифровой архитектуры бизнеса: что это и зачем менеджеру/техлиду → CTA на регистрацию. Хорошо работает в Telegram как органический репост.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== 5. INSIGHTS ===== -->
+  <div class="panel" id="panel-insights">
+    <div class="insights-grid">
+
+      <div class="insight-card">
+        <div class="insight-num">01</div>
+        <div class="insight-title">Рынок перегрет AI-риторикой</div>
+        <div class="insight-text">ИТМО, Сколково, ЦУ — все активно используют AI как главный триггер. Это создаёт «баннерную слепоту» у аудитории. Контур Университету выгодно говорить про архитектуру и устойчивость, а не про AI как тренд.</div>
+        <span class="insight-tag tag-opportunity">Возможность</span>
+      </div>
+
+      <div class="insight-card">
+        <div class="insight-num">02</div>
+        <div class="insight-title">Никто не продаёт артефакты выпускника</div>
+        <div class="insight-text">ВШЭ и СберУниверситет обещают «освоить» и «научиться», но не показывают конкретно — что студент возьмёт с собой. Прямая возможность для дифференциации: «конкретный результат на руках».</div>
+        <span class="insight-tag tag-opportunity">Возможность</span>
+      </div>
+
+      <div class="insight-card">
+        <div class="insight-num">03</div>
+        <div class="insight-title">Сколково задаёт стандарт executive-упаковки</div>
+        <div class="insight-text">Их лендинг — эталон: конкретные результаты, менторы, ROI, дефицит мест. Для конкуренции нужен сопоставимый уровень визуальной подачи и конкретики в оффере.</div>
+        <span class="insight-tag tag-risk">Вызов</span>
+      </div>
+
+      <div class="insight-card">
+        <div class="insight-num">04</div>
+        <div class="insight-title">Нативные посевы работают лучше</div>
+        <div class="insight-text">Практика Школы 21 и ЦУ подтверждает: нативный контент в тематических IT-каналах конвертирует лучше, чем прямая реклама. Ключ — соответствие tone of voice канала и тематике аудитории.</div>
+        <span class="insight-tag tag-action">К действию</span>
+      </div>
+
+      <div class="insight-card">
+        <div class="insight-num">05</div>
+        <div class="insight-title">Бесплатный вход — лучший прогрев</div>
+        <div class="insight-text">ЦУ активно использует бесплатные интенсивы как точку входа в воронку. Сколково — открытые вебинары. Бесплатный формат снижает порог решения и прогревает аудиторию до платного продукта.</div>
+        <span class="insight-tag tag-action">К действию</span>
+      </div>
+
+    </div>
+  </div>
+
+</div>
+
+<script>
+  function showTab(id, event) {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+    event.currentTarget.classList.add('active');
+    document.getElementById('panel-' + id).classList.add('active');
+
+    const cards = document.querySelectorAll(
+      '#panel-' + id + ' .comp-card, #panel-' + id + ' .promo-card, #panel-' + id + ' .insight-card, #panel-' + id + ' .format-card, #panel-' + id + ' .gap-card'
+    );
+    cards.forEach((c, i) => {
+      c.style.animation = 'none';
+      c.offsetHeight;
+      c.style.opacity = '0';
+      c.style.transform = 'translateY(16px)';
+      c.style.animation = `fadeUp 0.4s ease ${i * 0.06}s forwards`;
+    });
+  }
+</script>
+</body>
+</html>
